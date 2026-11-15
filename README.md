@@ -45,3 +45,20 @@ Research artifact bundle prepared from existing local project files on **2026-11
 Review the public repository for usernames, machine/network information, and any sensitive logs before publishing. Do not commit credentials, SSH keys, private cloud IDs, or confidential data. A coarse redaction may break recorded checksums: keep the original private, publish a separately labeled redacted derivative, and document the difference.
 
 **Original evidence SHA-256:** `f8c97f99dadbc4bac47c1bbe0458be98bae7c92228d79e5184862e43255b6032`
+
+## Experimental evidence release
+
+The public experimental evidence archive is available in
+[BPFSeal Experimental Evidence v0.1](https://github.com/ssonparo/BPFSeal/releases/tag/v0.1-artifacts).
+
+The release contains 361 files: 352 unchanged from the original
+AWS evidence archive and 9 with documented EC2 hostname
+redactions. Three binary perf recordings were excluded.
+
+All retained CSV measurements are byte-for-byte identical
+to the originals. The release provides a SHA-256 checksum
+and a redaction report.
+
+The original, unmodified evidence archive is preserved
+separately. Full kernel-build reproduction instructions
+are being finalized.
