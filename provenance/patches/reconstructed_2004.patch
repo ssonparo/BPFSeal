@@ -1,0 +1,307 @@
+--- a/include/linux/bpf.h
++++ b/include/linux/bpf.h
+@@ -1812,11 +1812,29 @@
+ 	};
+ };
+ 
++/* BPFSeal Iteration 2A: experimental kernel-internal evidence snapshot. */
++struct bpfseal_map_evidence {
++	u32 map_id;
++	u32 max_entries;
++	u64 map_cookie;
++	u64 generation;
++	u8 digest[SHA256_DIGEST_SIZE];
++	bool valid;
++};
++
++int bpfseal_prog_array_snapshot(struct bpf_map *map,
++				struct bpfseal_map_evidence *evidence);
++
+ struct bpf_array_aux {
+ 	/* Programs with direct jumps into programs part of this array. */
+ 	struct list_head poke_progs;
+ 	struct bpf_map *map;
+ 	struct mutex poke_mutex;
++	/* BPFSEAL_ITER1B: serialized PROG_ARRAY mutation generation. */
++	u64 bpfseal_generation;
++	/* BPFSEAL_ITER1C: digest is valid only for <=64 slots. */
++	u8 bpfseal_digest[SHA256_DIGEST_SIZE];
++	bool bpfseal_digest_valid;
+ 	struct work_struct work;
+ };
+ 
+--- a/kernel/bpf/arraymap.c
++++ b/kernel/bpf/arraymap.c
+@@ -3,6 +3,7 @@
+  * Copyright (c) 2016,2017 Facebook
+  */
+ #include <linux/bpf.h>
++#include <crypto/sha2.h> /* BPFSEAL_ITER1C */
+ #include <linux/btf.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
+@@ -897,12 +898,100 @@
+ }
+ 
+ /* only called from syscall */
++/* BPFSEAL_ITER1C: experimental per-map content digest, not attestation. */
++#define BPFSEAL_ITER1C_MAX_SLOTS 64
++#define BPFSEAL_ITER1C_SLOT_BYTES (1 + BPF_TAG_SIZE + 8)
++#define BPFSEAL_ITER1C_PREFIX_BYTES (16 + 8 + 4)
++#define BPFSEAL_ITER1C_BYTES (BPFSEAL_ITER1C_PREFIX_BYTES + \
++                              BPFSEAL_ITER1C_MAX_SLOTS * BPFSEAL_ITER1C_SLOT_BYTES)
++
++static void bpfseal_iter1c_put_be64(u8 *out, u64 val)
++{
++	int i;
++
++	for (i = 0; i < 8; i++)
++		out[i] = (u8)(val >> (56 - 8 * i));
++}
++
++static void bpfseal_iter1c_put_be32(u8 *out, u32 val)
++{
++	int i;
++
++	for (i = 0; i < 4; i++)
++		out[i] = (u8)(val >> (24 - 8 * i));
++}
++
++/* Caller must hold poke_mutex. This deliberately has bounded O(64) cost. */
++static bool bpfseal_iter1c_digest(struct bpf_array *array)
++{
++	struct bpf_map *map = &array->map;
++	u8 canonical[BPFSEAL_ITER1C_BYTES] = { 0 };
++	u32 i;
++
++	if (map->max_entries > BPFSEAL_ITER1C_MAX_SLOTS) {
++		array->aux->bpfseal_digest_valid = false;
++		return false;
++	}
++
++	memcpy(canonical, "BPFSeal-array-v1", 16);
++	bpfseal_iter1c_put_be64(canonical + 16, map->cookie);
++	bpfseal_iter1c_put_be32(canonical + 24, map->max_entries);
++
++	for (i = 0; i < map->max_entries; i++) {
++		struct bpf_prog *prog = READ_ONCE(array->ptrs[i]);
++		u8 *slot = canonical + BPFSEAL_ITER1C_PREFIX_BYTES +
++			i * BPFSEAL_ITER1C_SLOT_BYTES;
++
++		if (!prog)
++			continue;
++		slot[0] = 1;
++		memcpy(slot + 1, prog->tag, BPF_TAG_SIZE);
++		bpfseal_iter1c_put_be64(slot + 1 + BPF_TAG_SIZE,
++					prog->aux->load_time);
++	}
++	sha256(canonical, sizeof(canonical), array->aux->bpfseal_digest);
++	array->aux->bpfseal_digest_valid = true;
++	return true;
++}
++
++/*
++ * BPFSeal Iteration 2A: coherent map-level bookkeeping snapshot.
++ * Caller must hold a live reference to map; no copy_to_user under mutex.
++ */
++int bpfseal_prog_array_snapshot(struct bpf_map *map,
++				struct bpfseal_map_evidence *evidence)
++{
++	struct bpf_array *array;
++
++	if (!map || !evidence)
++		return -EINVAL;
++	if (map->map_type != BPF_MAP_TYPE_PROG_ARRAY)
++		return -EOPNOTSUPP;
++
++	array = container_of(map, struct bpf_array, map);
++	mutex_lock(&array->aux->poke_mutex);
++	memset(evidence, 0, sizeof(*evidence));
++	evidence->map_id = map->id;
++	evidence->max_entries = map->max_entries;
++	evidence->map_cookie = map->cookie;
++	evidence->generation = array->aux->bpfseal_generation;
++	evidence->valid = array->aux->bpfseal_digest_valid;
++	if (evidence->valid)
++		memcpy(evidence->digest, array->aux->bpfseal_digest,
++		       SHA256_DIGEST_SIZE);
++	mutex_unlock(&array->aux->poke_mutex);
++	return 0;
++}
++
+ int bpf_fd_array_map_update_elem(struct bpf_map *map, struct file *map_file,
+ 				 void *key, void *value, u64 map_flags)
+ {
+ 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+ 	void *new_ptr, *old_ptr;
+ 	u32 index = *(u32 *)key, ufd;
++	u64 bpfseal_gen = 0; /* BPFSEAL_ITER1B */
++	u8 bpfseal_digest[SHA256_DIGEST_SIZE]; /* BPFSEAL_ITER1C */
++	bool bpfseal_digest_valid = false;
+ 
+ 	if (map_flags != BPF_ANY)
+ 		return -EINVAL;
+@@ -919,11 +1008,39 @@
+ 		mutex_lock(&array->aux->poke_mutex);
+ 		old_ptr = xchg(array->ptrs + index, new_ptr);
+ 		map->ops->map_poke_run(map, index, old_ptr, new_ptr);
++		/* BPFSEAL_ITER1B: ordered within this PROG_ARRAY. */
++		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY)
++			bpfseal_gen = ++array->aux->bpfseal_generation;
++		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
++			bpfseal_digest_valid = bpfseal_iter1c_digest(array);
++			if (bpfseal_digest_valid)
++				memcpy(bpfseal_digest, array->aux->bpfseal_digest,
++				       SHA256_DIGEST_SIZE);
++		}
+ 		mutex_unlock(&array->aux->poke_mutex);
+ 	} else {
+ 		old_ptr = xchg(array->ptrs + index, new_ptr);
+ 	}
+ 
++	/* BPFSEAL_ITER1A: diagnostic event only; not atomic attestation. */
++	if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
++		struct bpf_prog *before = old_ptr;
++		struct bpf_prog *after = new_ptr;
++
++		pr_info("BPFSEAL_ITER1A BPFSEAL_ITER1B update map=%u slot=%u old=%u new=%u gen=%llu\n",
++			map->id, index,
++			before ? before->aux->id : 0,
++			after ? after->aux->id : 0,
++			(unsigned long long)bpfseal_gen);
++	}
++
++	/* BPFSEAL_ITER1C: digest captured while mutex was held. */
++	if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY && bpfseal_digest_valid)
++		pr_info("BPFSEAL_ITER1C update map=%u cookie=%llu gen=%llu digest=%*phN\n",
++			map->id,
++			(unsigned long long)map->cookie,
++			(unsigned long long)bpfseal_gen,
++			SHA256_DIGEST_SIZE, bpfseal_digest);
+ 	if (old_ptr)
+ 		map->ops->map_fd_put_ptr(map, old_ptr, true);
+ 	return 0;
+@@ -934,6 +1051,9 @@
+ 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+ 	void *old_ptr;
+ 	u32 index = *(u32 *)key;
++	u64 bpfseal_gen = 0; /* BPFSEAL_ITER1B */
++	u8 bpfseal_digest[SHA256_DIGEST_SIZE]; /* BPFSEAL_ITER1C */
++	bool bpfseal_digest_valid = false;
+ 
+ 	if (index >= array->map.max_entries)
+ 		return -E2BIG;
+@@ -942,12 +1062,36 @@
+ 		mutex_lock(&array->aux->poke_mutex);
+ 		old_ptr = xchg(array->ptrs + index, NULL);
+ 		map->ops->map_poke_run(map, index, old_ptr, NULL);
++		/* BPFSEAL_ITER1B: failed empty-slot deletes do not advance. */
++		if (old_ptr && map->map_type == BPF_MAP_TYPE_PROG_ARRAY)
++			bpfseal_gen = ++array->aux->bpfseal_generation;
++		if (old_ptr && map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
++			bpfseal_digest_valid = bpfseal_iter1c_digest(array);
++			if (bpfseal_digest_valid)
++				memcpy(bpfseal_digest, array->aux->bpfseal_digest,
++				       SHA256_DIGEST_SIZE);
++		}
+ 		mutex_unlock(&array->aux->poke_mutex);
+ 	} else {
+ 		old_ptr = xchg(array->ptrs + index, NULL);
+ 	}
+ 
+ 	if (old_ptr) {
++		/* BPFSEAL_ITER1A: diagnostic event on successful removal. */
++		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
++			struct bpf_prog *before = old_ptr;
++
++			pr_info("BPFSEAL_ITER1A BPFSEAL_ITER1B delete map=%u slot=%u old=%u new=0 gen=%llu\n",
++				map->id, index, before->aux->id,
++				(unsigned long long)bpfseal_gen);
++		}
++		/* BPFSEAL_ITER1C: no digest is published for empty deletes. */
++		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY && bpfseal_digest_valid)
++			pr_info("BPFSEAL_ITER1C delete map=%u cookie=%llu gen=%llu digest=%*phN\n",
++				map->id,
++				(unsigned long long)map->cookie,
++				(unsigned long long)bpfseal_gen,
++				SHA256_DIGEST_SIZE, bpfseal_digest);
+ 		map->ops->map_fd_put_ptr(map, old_ptr, need_defer);
+ 		return 0;
+ 	} else {
+--- a/kernel/bpf/syscall.c
++++ b/kernel/bpf/syscall.c
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /* Copyright (c) 2011-2014 PLUMgrid, http://plumgrid.com
+  */
++#include <linux/ioctl.h>
+ #include <crypto/sha2.h>
+ #include <linux/bpf.h>
+ #include <linux/bpf-cgroup.h>
+@@ -1171,11 +1172,66 @@
+ #endif
+ }
+ 
++/*
++ * BPFSeal Iteration 2A experimental interface, not a Linux UAPI proposal.
++ * ABI is private to this test kernel and companion harness.
++ * Supported on native x86-64 only (no compat_ioctl implementation).
++ */
++struct bpfseal_ioctl_evidence {
++	__u32 version;
++	__u32 map_id;
++	__u32 max_entries;
++	__u32 valid;
++	__u64 map_cookie;
++	__u64 generation;
++	__u8 digest[SHA256_DIGEST_SIZE];
++};
++
++#define BPFSEAL_IOCTL_GET_EVIDENCE _IOR('Q', 0xe1, struct bpfseal_ioctl_evidence)
++
++static long bpfseal_map_ioctl(struct file *filp, unsigned int cmd,
++			      unsigned long arg)
++{
++	struct bpfseal_ioctl_evidence out = { 0 };
++	struct bpfseal_map_evidence snapshot;
++	struct bpf_map *map = filp->private_data;
++	int err;
++
++	if (cmd != BPFSEAL_IOCTL_GET_EVIDENCE)
++		return -ENOTTY;
++	/* Only privileged test clients may observe raw map cookie and digest. */
++	if (!capable(CAP_SYS_ADMIN))
++		return -EPERM;
++	if (!(filp->f_mode & FMODE_READ))
++		return -EBADF;
++	if (!arg)
++		return -EFAULT;
++
++	/* filp holds a map reference until the ioctl has finished. */
++	err = bpfseal_prog_array_snapshot(map, &snapshot);
++	if (err)
++		return err;
++
++	out.version = 1;
++	out.map_id = snapshot.map_id;
++	out.max_entries = snapshot.max_entries;
++	out.valid = snapshot.valid ? 1 : 0;
++	out.map_cookie = snapshot.map_cookie;
++	out.generation = snapshot.generation;
++	if (snapshot.valid)
++		memcpy(out.digest, snapshot.digest, SHA256_DIGEST_SIZE);
++
++	if (copy_to_user((void __user *)arg, &out, sizeof(out)))
++		return -EFAULT;
++	return 0;
++}
++
+ const struct file_operations bpf_map_fops = {
+ #ifdef CONFIG_PROC_FS
+ 	.show_fdinfo	= bpf_map_show_fdinfo,
+ #endif
+ 	.release	= bpf_map_release,
++	.unlocked_ioctl	= bpfseal_map_ioctl,
+ 	.read		= bpf_dummy_read,
+ 	.write		= bpf_dummy_write,
+ 	.mmap		= bpf_map_mmap,

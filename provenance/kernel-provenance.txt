@@ -1,0 +1,15 @@
+=== DATE ===
+Sun Nov 15 01:34:12 UTC 2026
+=== RUNNING KERNEL ===
+Linux ip-172-31-32-229 7.0.0-2003-aws #14~24.04.1 SMP PREEMPT Mon Nov  2 19:08:37 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+=== ORIGINAL SOURCE PACKAGE ===
+linux-aws-7.0 (7.0.0-1014.14~24.04.1) noble; urgency=medium
+=== SOURCE PACKAGE METADATA ===
+kernel/linux-aws-7.0_7.0.0-1014.14~24.04.1.diff.gz
+kernel/linux-aws-7.0_7.0.0-1014.14~24.04.1.dsc
+kernel/linux-meta-aws-7.0_7.0.0-1014.14~24.04.1.dsc
+kernel/linux-aws-7.0_7.0.0.orig.tar.gz
+=== BUILD TOOL VERSIONS ===
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+GNU Make 4.3
+Debian dpkg-buildpackage version 1.22.6.
