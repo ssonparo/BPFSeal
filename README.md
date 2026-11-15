@@ -62,3 +62,22 @@ and a redaction report.
 The original, unmodified evidence archive is preserved
 separately. Full kernel-build reproduction instructions
 are being finalized.
+
+## Kernel build provenance
+
+The recovered Ubuntu AWS kernel source-package identity,
+experimental kernel variants, verified patches, and build-tool
+versions are documented in [provenance/README.md](provenance/README.md).
+
+Original Ubuntu source package:
+`linux-aws-7.0` version `7.0.0-1014.14~24.04.1`.
+
+The BPFSeal patch sections for builds 2004, 2006, and 2007
+were verified against their corresponding experimental
+kernel source files.
+
+The recovered build script and source-package metadata
+are preserved in `provenance/build/`.
+
+Independent reconstruction of all experimental kernel
+binaries has not yet been demonstrated.
