@@ -1,0 +1,6 @@
+# Large experiment archive should be tracked with Git LFS, not ordinary Git history.
+evidence/raw/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+# Binary research documents are optional LFS objects
+paper/*.pdf filter=lfs diff=lfs merge=lfs -text
+paper/*.docx filter=lfs diff=lfs merge=lfs -text
+analysis/offline/*.png filter=lfs diff=lfs merge=lfs -text

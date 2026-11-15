@@ -1,0 +1,7 @@
+[   94.272030] BPFSEAL_ITER1A BPFSEAL_ITER1B update map=1 slot=0 old=0 new=24 gen=1
+[   94.272058] BPFSEAL_ITER1A BPFSEAL_ITER1B update map=1 slot=0 old=24 new=25 gen=2
+[   94.279086] BPFSEAL_ITER1A BPFSEAL_ITER1B delete map=1 slot=0 old=25 new=0 gen=3
+[   94.287778] BPFSEAL_ITER1A BPFSEAL_ITER1B update map=2 slot=0 old=0 new=29 gen=1
+[   94.287830] BPFSEAL_ITER1A BPFSEAL_ITER1B update map=3 slot=0 old=0 new=30 gen=1
+[   94.287868] BPFSEAL_ITER1A BPFSEAL_ITER1B update map=3 slot=0 old=30 new=31 gen=2
+[   94.295341] BPFSEAL_ITER1A BPFSEAL_ITER1B delete map=3 slot=0 old=31 new=0 gen=3

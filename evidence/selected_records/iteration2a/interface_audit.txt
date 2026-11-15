@@ -1,0 +1,1237 @@
+BPFSeal Iteration 2A read-only interface/cleanup audit
+Generated UTC: 2026-11-02T19:44:55.189166+00:00
+Host kernel: 7.0.0-2003-aws
+Source root: /home/ubuntu/bpfseal/kernel/linux-aws-7.0-bpfseal-patched
+Patch present: True
+
+
+===== BPF_OBJ_GET_INFO_BY_FD dispatcher (matches=1) =====
+  5470 	return bpf_token_get_info_by_fd(token, attr, uattr);
+  5471 }
+  5472 
+  5473 #define BPF_OBJ_GET_INFO_BY_FD_LAST_FIELD info.info
+  5474 
+  5475 static int bpf_obj_get_info_by_fd(const union bpf_attr *attr,
+  5476 				  union bpf_attr __user *uattr)
+  5477 {
+  5478 	if (CHECK_ATTR(BPF_OBJ_GET_INFO_BY_FD))
+  5479 		return -EINVAL;
+  5480 
+  5481 	CLASS(fd, f)(attr->info.bpf_fd);
+  5482 	if (fd_empty(f))
+  5483 		return -EBADFD;
+  5484 
+  5485 	if (fd_file(f)->f_op == &bpf_prog_fops)
+  5486 		return bpf_prog_get_info_by_fd(fd_file(f), fd_file(f)->private_data, attr,
+  5487 					      uattr);
+  5488 	else if (fd_file(f)->f_op == &bpf_map_fops)
+  5489 		return bpf_map_get_info_by_fd(fd_file(f), fd_file(f)->private_data, attr,
+  5490 					     uattr);
+  5491 	else if (fd_file(f)->f_op == &btf_fops)
+  5492 		return bpf_btf_get_info_by_fd(fd_file(f), fd_file(f)->private_data, attr, uattr);
+  5493 	else if (fd_file(f)->f_op == &bpf_link_fops || fd_file(f)->f_op == &bpf_link_fops_poll)
+  5494 		return bpf_link_get_info_by_fd(fd_file(f), fd_file(f)->private_data,
+  5495 					      attr, uattr);
+  5496 	else if (fd_file(f)->f_op == &bpf_token_fops)
+  5497 		return token_get_info_by_fd(fd_file(f), fd_file(f)->private_data,
+  5498 					    attr, uattr);
+  5499 	return -EINVAL;
+  5500 }
+  5501 
+  5502 #define BPF_BTF_LOAD_LAST_FIELD btf_token_fd
+  5503 
+  5504 static int bpf_btf_load(const union bpf_attr *attr, bpfptr_t uattr, __u32 uattr_size)
+  5505 {
+  5506 	struct bpf_token *token = NULL;
+  5507 
+  5508 	if (CHECK_ATTR(BPF_BTF_LOAD))
+  5509 		return -EINVAL;
+  5510 
+  5511 	if (attr->btf_flags & ~BPF_F_TOKEN_FD)
+  5512 		return -EINVAL;
+  5513 
+  5514 	if (attr->btf_flags & BPF_F_TOKEN_FD) {
+  5515 		token = bpf_token_get_from_fd(attr->btf_token_fd);
+  5516 		if (IS_ERR(token))
+  5517 			return PTR_ERR(token);
+  5518 		if (!bpf_token_allow_cmd(token, BPF_BTF_LOAD)) {
+  5519 			bpf_token_put(token);
+  5520 			token = NULL;
+  5521 		}
+  5522 	}
+  5523 
+  5524 	if (!bpf_token_capable(token, CAP_BPF)) {
+  5525 		bpf_token_put(token);
+  5526 		return -EPERM;
+  5527 	}
+  5528 
+  5529 	bpf_token_put(token);
+  5530 
+  5531 	return btf_new_fd(attr, uattr, uattr_size);
+---
+
+===== Map information handler (matches=1) =====
+  5325 	    put_user(info_len, &uattr->info.info_len))
+  5326 		return -EFAULT;
+  5327 
+  5328 	return 0;
+  5329 }
+  5330 
+  5331 static int bpf_map_get_info_by_fd(struct file *file,
+  5332 				  struct bpf_map *map,
+  5333 				  const union bpf_attr *attr,
+  5334 				  union bpf_attr __user *uattr)
+  5335 {
+  5336 	struct bpf_map_info __user *uinfo = u64_to_user_ptr(attr->info.info);
+  5337 	struct bpf_map_info info;
+  5338 	u32 info_len = attr->info.info_len, len;
+  5339 	int err;
+  5340 
+  5341 	len = offsetofend(struct bpf_map_info, hash_size);
+  5342 	err = bpf_check_uarg_tail_zero(USER_BPFPTR(uinfo), len, info_len);
+  5343 	if (err)
+  5344 		return err;
+  5345 	info_len = min_t(u32, sizeof(info), info_len);
+  5346 
+  5347 	memset(&info, 0, sizeof(info));
+  5348 	if (copy_from_user(&info, uinfo, info_len))
+  5349 		return -EFAULT;
+  5350 
+  5351 	info.type = map->map_type;
+  5352 	info.id = map->id;
+  5353 	info.key_size = map->key_size;
+  5354 	info.value_size = map->value_size;
+  5355 	info.max_entries = map->max_entries;
+  5356 	info.map_flags = map->map_flags;
+  5357 	info.map_extra = map->map_extra;
+  5358 	memcpy(info.name, map->name, sizeof(map->name));
+  5359 
+  5360 	if (map->btf) {
+  5361 		info.btf_id = btf_obj_id(map->btf);
+  5362 		info.btf_key_type_id = map->btf_key_type_id;
+  5363 		info.btf_value_type_id = map->btf_value_type_id;
+  5364 	}
+  5365 	info.btf_vmlinux_value_type_id = map->btf_vmlinux_value_type_id;
+  5366 	if (map->map_type == BPF_MAP_TYPE_STRUCT_OPS)
+  5367 		bpf_map_struct_ops_info_fill(&info, map);
+  5368 
+  5369 	if (bpf_map_is_offloaded(map)) {
+  5370 		err = bpf_map_offload_info_fill(&info, map);
+  5371 		if (err)
+  5372 			return err;
+  5373 	}
+  5374 
+  5375 	if (info.hash) {
+  5376 		char __user *uhash = u64_to_user_ptr(info.hash);
+  5377 
+  5378 		if (!map->ops->map_get_hash)
+  5379 			return -EINVAL;
+  5380 
+  5381 		if (info.hash_size != SHA256_DIGEST_SIZE)
+  5382 			return -EINVAL;
+  5383 
+  5384 		if (!READ_ONCE(map->frozen))
+  5385 			return -EPERM;
+  5386 
+  5387 		err = map->ops->map_get_hash(map, SHA256_DIGEST_SIZE, map->sha);
+  5388 		if (err != 0)
+  5389 			return err;
+  5390 
+  5391 		if (copy_to_user(uhash, map->sha, SHA256_DIGEST_SIZE) != 0)
+  5392 			return -EFAULT;
+  5393 	} else if (info.hash_size) {
+  5394 		return -EINVAL;
+  5395 	}
+  5396 
+  5397 	if (copy_to_user(uinfo, &info, info_len) ||
+  5398 	    put_user(info_len, &uattr->info.info_len))
+  5399 		return -EFAULT;
+  5400 
+  5401 	return 0;
+  5402 }
+  5403 
+  5404 static int bpf_btf_get_info_by_fd(struct file *file,
+  5405 				  struct btf *btf,
+  5406 				  const union bpf_attr *attr,
+  5407 				  union bpf_attr __user *uattr)
+  5408 {
+  5409 	struct bpf_btf_info __user *uinfo = u64_to_user_ptr(attr->info.info);
+  5410 	u32 info_len = attr->info.info_len;
+  5411 	int err;
+  5412 
+  5413 	err = bpf_check_uarg_tail_zero(USER_BPFPTR(uinfo), sizeof(*uinfo), info_len);
+  5414 	if (err)
+  5415 		return err;
+  5416 
+  5417 	return btf_get_info_by_fd(btf, attr, uattr);
+  5418 }
+  5419 
+  5420 static int bpf_link_get_info_by_fd(struct file *file,
+  5421 				  struct bpf_link *link,
+  5422 				  const union bpf_attr *attr,
+  5423 				  union bpf_attr __user *uattr)
+  5424 {
+  5425 	struct bpf_link_info __user *uinfo = u64_to_user_ptr(attr->info.info);
+  5426 	struct bpf_link_info info;
+  5427 	u32 info_len = attr->info.info_len;
+  5428 	int err;
+  5429 
+  5430 	err = bpf_check_uarg_tail_zero(USER_BPFPTR(uinfo), sizeof(info), info_len);
+  5431 	if (err)
+  5432 		return err;
+  5433 	info_len = min_t(u32, sizeof(info), info_len);
+  5434 
+  5435 	memset(&info, 0, sizeof(info));
+  5436 	if (copy_from_user(&info, uinfo, info_len))
+  5437 		return -EFAULT;
+  5438 
+  5439 	info.type = link->type;
+  5440 	info.id = link->id;
+  5441 	if (link->prog)
+  5442 		info.prog_id = link->prog->aux->id;
+  5443 
+  5444 	if (link->ops->fill_link_info) {
+  5445 		err = link->ops->fill_link_info(link, &info);
+  5446 		if (err)
+---
+
+===== Map FD retrieval and lifetime (matches=2) =====
+   975 EXPORT_SYMBOL_GPL(bpf_map_put);
+   976 
+   977 void bpf_map_put_with_uref(struct bpf_map *map)
+   978 {
+   979 	bpf_map_put_uref(map);
+   980 	bpf_map_put(map);
+   981 }
+   982 
+   983 static int bpf_map_release(struct inode *inode, struct file *filp)
+   984 {
+   985 	struct bpf_map *map = filp->private_data;
+   986 
+   987 	if (map->ops->map_release)
+   988 		map->ops->map_release(map, filp);
+   989 
+   990 	bpf_map_put_with_uref(map);
+   991 	return 0;
+   992 }
+   993 
+   994 static fmode_t map_get_sys_perms(struct bpf_map *map, struct fd f)
+   995 {
+   996 	fmode_t mode = fd_file(f)->f_mode;
+   997 
+   998 	/* Our file permissions may have been overridden by global
+   999 	 * map permissions facing syscall side.
+  1000 	 */
+  1001 	if (READ_ONCE(map->frozen))
+  1002 		mode &= ~FMODE_CAN_WRITE;
+  1003 	return mode;
+  1004 }
+  1005 
+  1006 #ifdef CONFIG_PROC_FS
+  1007 /* Show the memory usage of a bpf map */
+  1008 static u64 bpf_map_memory_usage(const struct bpf_map *map)
+  1009 {
+  1010 	return map->ops->map_mem_usage(map);
+  1011 }
+  1012 
+  1013 static void bpf_map_show_fdinfo(struct seq_file *m, struct file *filp)
+  1014 {
+  1015 	struct bpf_map *map = filp->private_data;
+  1016 	u32 type = 0, jited = 0;
+  1017 
+  1018 	spin_lock(&map->owner_lock);
+  1019 	if (map->owner) {
+  1020 		type  = map->owner->type;
+  1021 		jited = map->owner->jited;
+  1022 	}
+  1023 	spin_unlock(&map->owner_lock);
+  1024 
+  1025 	seq_printf(m,
+  1026 		   "map_type:\t%u\n"
+  1027 		   "key_size:\t%u\n"
+  1028 		   "value_size:\t%u\n"
+  1029 		   "max_entries:\t%u\n"
+  1030 		   "map_flags:\t%#x\n"
+  1031 		   "map_extra:\t%#llx\n"
+  1032 		   "memlock:\t%llu\n"
+  1033 		   "map_id:\t%u\n"
+  1034 		   "frozen:\t%u\n",
+  1035 		   map->map_type,
+  1036 		   map->key_size,
+  1037 		   map->value_size,
+  1038 		   map->max_entries,
+  1039 		   map->map_flags,
+  1040 		   (unsigned long long)map->map_extra,
+  1041 		   bpf_map_memory_usage(map),
+  1042 		   map->id,
+  1043 		   READ_ONCE(map->frozen));
+  1044 	if (type) {
+  1045 		seq_printf(m, "owner_prog_type:\t%u\n", type);
+  1046 		seq_printf(m, "owner_jited:\t%u\n", jited);
+  1047 	}
+  1048 }
+  1049 #endif
+  1050 
+  1051 static ssize_t bpf_dummy_read(struct file *filp, char __user *buf, size_t siz,
+  1052 			      loff_t *ppos)
+  1053 {
+---
+  4880 	if (fd < 0)
+  4881 		bpf_prog_put(prog);
+  4882 
+  4883 	return fd;
+  4884 }
+  4885 
+  4886 #define BPF_MAP_GET_FD_BY_ID_LAST_FIELD open_flags
+  4887 
+  4888 static int bpf_map_get_fd_by_id(const union bpf_attr *attr)
+  4889 {
+  4890 	struct bpf_map *map;
+  4891 	u32 id = attr->map_id;
+  4892 	int f_flags;
+  4893 	int fd;
+  4894 
+  4895 	if (CHECK_ATTR(BPF_MAP_GET_FD_BY_ID) ||
+  4896 	    attr->open_flags & ~BPF_OBJ_FLAG_MASK)
+  4897 		return -EINVAL;
+  4898 
+  4899 	if (!capable(CAP_SYS_ADMIN))
+  4900 		return -EPERM;
+  4901 
+  4902 	f_flags = bpf_get_file_flag(attr->open_flags);
+  4903 	if (f_flags < 0)
+  4904 		return f_flags;
+  4905 
+  4906 	spin_lock_bh(&map_idr_lock);
+  4907 	map = idr_find(&map_idr, id);
+  4908 	if (map)
+  4909 		map = __bpf_map_inc_not_zero(map, true);
+  4910 	else
+  4911 		map = ERR_PTR(-ENOENT);
+  4912 	spin_unlock_bh(&map_idr_lock);
+  4913 
+  4914 	if (IS_ERR(map))
+  4915 		return PTR_ERR(map);
+  4916 
+  4917 	fd = bpf_map_new_fd(map, f_flags);
+  4918 	if (fd < 0)
+  4919 		bpf_map_put_with_uref(map);
+  4920 
+  4921 	return fd;
+  4922 }
+  4923 
+  4924 static const struct bpf_map *bpf_map_from_imm(const struct bpf_prog *prog,
+  4925 					      unsigned long addr, u32 *off,
+  4926 					      u32 *type)
+  4927 {
+  4928 	const struct bpf_map *map;
+  4929 	int i;
+  4930 
+  4931 	mutex_lock(&prog->aux->used_maps_mutex);
+  4932 	for (i = 0, *off = 0; i < prog->aux->used_map_cnt; i++) {
+  4933 		map = prog->aux->used_maps[i];
+  4934 		if (map == (void *)addr) {
+  4935 			*type = BPF_PSEUDO_MAP_FD;
+  4936 			goto out;
+  4937 		}
+  4938 		if (!map->ops->map_direct_value_meta)
+  4939 			continue;
+  4940 		if (!map->ops->map_direct_value_meta(map, addr, off)) {
+  4941 			*type = BPF_PSEUDO_MAP_VALUE;
+  4942 			goto out;
+  4943 		}
+  4944 	}
+  4945 	map = NULL;
+  4946 
+  4947 out:
+  4948 	mutex_unlock(&prog->aux->used_maps_mutex);
+  4949 	return map;
+  4950 }
+  4951 
+  4952 static struct bpf_insn *bpf_insn_prepare_dump(const struct bpf_prog *prog,
+  4953 					      const struct cred *f_cred)
+  4954 {
+  4955 	const struct bpf_map *map;
+  4956 	struct bpf_insn *insns;
+  4957 	u32 off, type;
+  4958 	u64 imm;
+---
+
+===== Map release/file-ops (matches=1) =====
+  1167 #ifdef CONFIG_MMU
+  1168 	return mm_get_unmapped_area(filp, addr, len, pgoff, flags);
+  1169 #else
+  1170 	return addr;
+  1171 #endif
+  1172 }
+  1173 
+  1174 const struct file_operations bpf_map_fops = {
+  1175 #ifdef CONFIG_PROC_FS
+  1176 	.show_fdinfo	= bpf_map_show_fdinfo,
+  1177 #endif
+  1178 	.release	= bpf_map_release,
+  1179 	.read		= bpf_dummy_read,
+  1180 	.write		= bpf_dummy_write,
+  1181 	.mmap		= bpf_map_mmap,
+  1182 	.poll		= bpf_map_poll,
+  1183 	.get_unmapped_area = bpf_get_unmapped_area,
+  1184 };
+  1185 
+  1186 int bpf_map_new_fd(struct bpf_map *map, int flags)
+  1187 {
+  1188 	int ret;
+  1189 
+  1190 	ret = security_bpf_map(map, OPEN_FMODE(flags));
+  1191 	if (ret < 0)
+  1192 		return ret;
+  1193 
+  1194 	return anon_inode_getfd("bpf-map", &bpf_map_fops, map,
+  1195 				flags | O_CLOEXEC);
+  1196 }
+  1197 
+  1198 int bpf_get_file_flag(int flags)
+  1199 {
+  1200 	if ((flags & BPF_F_RDONLY) && (flags & BPF_F_WRONLY))
+  1201 		return -EINVAL;
+  1202 	if (flags & BPF_F_RDONLY)
+  1203 		return O_RDONLY;
+  1204 	if (flags & BPF_F_WRONLY)
+  1205 		return O_WRONLY;
+  1206 	return O_RDWR;
+  1207 }
+  1208 
+  1209 /* helper macro to check that unused fields 'union bpf_attr' are zero */
+  1210 #define CHECK_ATTR(CMD) \
+  1211 	memchr_inv((void *) &attr->CMD##_LAST_FIELD + \
+  1212 		   sizeof(attr->CMD##_LAST_FIELD), 0, \
+  1213 		   sizeof(*attr) - \
+  1214 		   offsetof(union bpf_attr, CMD##_LAST_FIELD) - \
+  1215 		   sizeof(attr->CMD##_LAST_FIELD)) != NULL
+  1216 
+  1217 /* dst and src must have at least "size" number of bytes.
+  1218  * Return strlen on success and < 0 on error.
+  1219  */
+  1220 int bpf_obj_name_cpy(char *dst, const char *src, unsigned int size)
+  1221 {
+  1222 	const char *end = src + size;
+  1223 	const char *orig_src = src;
+  1224 
+  1225 	memset(dst, 0, size);
+  1226 	/* Copy all isalnum(), '_' and '.' chars. */
+---
+
+===== Map UAPI structure (matches=1) =====
+  6698 	__u32 attach_btf_id;
+  6699 	__u32 :32;
+  6700 } __attribute__((aligned(8)));
+  6701 
+  6702 struct bpf_map_info {
+  6703 	__u32 type;
+  6704 	__u32 id;
+  6705 	__u32 key_size;
+  6706 	__u32 value_size;
+  6707 	__u32 max_entries;
+  6708 	__u32 map_flags;
+  6709 	char  name[BPF_OBJ_NAME_LEN];
+  6710 	__u32 ifindex;
+  6711 	__u32 btf_vmlinux_value_type_id;
+  6712 	__u64 netns_dev;
+  6713 	__u64 netns_ino;
+  6714 	__u32 btf_id;
+  6715 	__u32 btf_key_type_id;
+  6716 	__u32 btf_value_type_id;
+  6717 	__u32 btf_vmlinux_id;
+  6718 	__u64 map_extra;
+  6719 	__aligned_u64 hash;
+  6720 	__u32 hash_size;
+  6721 	__u32 :32;
+  6722 } __attribute__((aligned(8)));
+  6723 
+  6724 struct bpf_btf_info {
+  6725 	__aligned_u64 btf;
+  6726 	__u32 btf_size;
+  6727 	__u32 id;
+  6728 	__aligned_u64 name;
+  6729 	__u32 name_len;
+  6730 	__u32 kernel_btf;
+  6731 } __attribute__((aligned(8)));
+  6732 
+  6733 struct bpf_link_info {
+  6734 	__u32 type;
+  6735 	__u32 id;
+  6736 	__u32 prog_id;
+  6737 	union {
+  6738 		struct {
+  6739 			__aligned_u64 tp_name; /* in/out: tp_name buffer ptr */
+  6740 			__u32 tp_name_len;     /* in/out: tp_name buffer len */
+  6741 			__u32 :32;
+  6742 			__u64 cookie;
+  6743 		} raw_tracepoint;
+  6744 		struct {
+---
+
+===== BPFSeal evidence type and helper declaration (matches=1) =====
+  1811 		DECLARE_FLEX_ARRAY(struct bpf_insn, insnsi);
+  1812 	};
+  1813 };
+  1814 
+  1815 /* BPFSeal Iteration 2A: experimental kernel-internal evidence snapshot. */
+  1816 struct bpfseal_map_evidence {
+  1817 	u32 map_id;
+  1818 	u32 max_entries;
+  1819 	u64 map_cookie;
+  1820 	u64 generation;
+  1821 	u8 digest[SHA256_DIGEST_SIZE];
+  1822 	bool valid;
+  1823 };
+  1824 
+  1825 int bpfseal_prog_array_snapshot(struct bpf_map *map,
+  1826 				struct bpfseal_map_evidence *evidence);
+  1827 
+  1828 struct bpf_array_aux {
+  1829 	/* Programs with direct jumps into programs part of this array. */
+  1830 	struct list_head poke_progs;
+  1831 	struct bpf_map *map;
+  1832 	struct mutex poke_mutex;
+  1833 	/* BPFSEAL_ITER1B: serialized PROG_ARRAY mutation generation. */
+  1834 	u64 bpfseal_generation;
+  1835 	/* BPFSEAL_ITER1C: digest is valid only for <=64 slots. */
+  1836 	u8 bpfseal_digest[SHA256_DIGEST_SIZE];
+  1837 	bool bpfseal_digest_valid;
+  1838 	struct work_struct work;
+  1839 };
+  1840 
+---
+
+===== BPFSeal synchronized snapshot helper (matches=1) =====
+   955 }
+   956 
+   957 /*
+   958  * BPFSeal Iteration 2A: coherent map-level bookkeeping snapshot.
+   959  * Caller must hold a live reference to map; no copy_to_user under mutex.
+   960  */
+   961 int bpfseal_prog_array_snapshot(struct bpf_map *map,
+   962 				struct bpfseal_map_evidence *evidence)
+   963 {
+   964 	struct bpf_array *array;
+   965 
+   966 	if (!map || !evidence)
+   967 		return -EINVAL;
+   968 	if (map->map_type != BPF_MAP_TYPE_PROG_ARRAY)
+   969 		return -EOPNOTSUPP;
+   970 
+   971 	array = container_of(map, struct bpf_array, map);
+   972 	mutex_lock(&array->aux->poke_mutex);
+   973 	memset(evidence, 0, sizeof(*evidence));
+   974 	evidence->map_id = map->id;
+   975 	evidence->max_entries = map->max_entries;
+   976 	evidence->map_cookie = map->cookie;
+   977 	evidence->generation = array->aux->bpfseal_generation;
+   978 	evidence->valid = array->aux->bpfseal_digest_valid;
+   979 	if (evidence->valid)
+   980 		memcpy(evidence->digest, array->aux->bpfseal_digest,
+   981 		       SHA256_DIGEST_SIZE);
+   982 	mutex_unlock(&array->aux->poke_mutex);
+   983 	return 0;
+   984 }
+   985 
+   986 int bpf_fd_array_map_update_elem(struct bpf_map *map, struct file *map_file,
+   987 				 void *key, void *value, u64 map_flags)
+   988 {
+   989 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+   990 	void *new_ptr, *old_ptr;
+   991 	u32 index = *(u32 *)key, ufd;
+   992 	u64 bpfseal_gen = 0; /* BPFSEAL_ITER1B */
+   993 	u8 bpfseal_digest[SHA256_DIGEST_SIZE]; /* BPFSEAL_ITER1C */
+   994 	bool bpfseal_digest_valid = false;
+   995 
+   996 	if (map_flags != BPF_ANY)
+   997 		return -EINVAL;
+   998 
+   999 	if (index >= array->map.max_entries)
+  1000 		return -E2BIG;
+  1001 
+  1002 	ufd = *(u32 *)value;
+  1003 	new_ptr = map->ops->map_fd_get_ptr(map, map_file, ufd);
+  1004 	if (IS_ERR(new_ptr))
+---
+
+===== Program-array allocation (matches=1) =====
+  1313 						 map)->aux;
+  1314 	bpf_map_inc(map);
+  1315 	schedule_work(&aux->work);
+  1316 }
+  1317 
+  1318 static struct bpf_map *prog_array_map_alloc(union bpf_attr *attr)
+  1319 {
+  1320 	struct bpf_array_aux *aux;
+  1321 	struct bpf_map *map;
+  1322 
+  1323 	aux = kzalloc_obj(*aux, GFP_KERNEL_ACCOUNT);
+  1324 	if (!aux)
+  1325 		return ERR_PTR(-ENOMEM);
+  1326 
+  1327 	INIT_WORK(&aux->work, prog_array_map_clear_deferred);
+  1328 	INIT_LIST_HEAD(&aux->poke_progs);
+  1329 	mutex_init(&aux->poke_mutex);
+  1330 
+  1331 	map = array_map_alloc(attr);
+  1332 	if (IS_ERR(map)) {
+  1333 		kfree(aux);
+  1334 		return map;
+  1335 	}
+  1336 
+  1337 	container_of(map, struct bpf_array, map)->aux = aux;
+  1338 	aux->map = map;
+  1339 
+  1340 	return map;
+  1341 }
+  1342 
+  1343 static void prog_array_map_free(struct bpf_map *map)
+  1344 {
+  1345 	struct prog_poke_elem *elem, *tmp;
+  1346 	struct bpf_array_aux *aux;
+  1347 
+  1348 	aux = container_of(map, struct bpf_array, map)->aux;
+  1349 	list_for_each_entry_safe(elem, tmp, &aux->poke_progs, list) {
+  1350 		list_del_init(&elem->list);
+  1351 		kfree(elem);
+  1352 	}
+  1353 	kfree(aux);
+  1354 	fd_array_map_free(map);
+  1355 }
+  1356 
+  1357 /* prog_array->aux->{type,jited} is a runtime binding.
+  1358  * Doing static check alone in the verifier is not enough.
+  1359  * Thus, prog_array_map cannot be used as an inner_map
+  1360  * and map_meta_equal is not implemented.
+  1361  */
+  1362 const struct bpf_map_ops prog_array_map_ops = {
+  1363 	.map_alloc_check = fd_array_map_alloc_check,
+  1364 	.map_alloc = prog_array_map_alloc,
+  1365 	.map_free = prog_array_map_free,
+  1366 	.map_poke_track = prog_array_map_poke_track,
+  1367 	.map_poke_untrack = prog_array_map_poke_untrack,
+  1368 	.map_poke_run = prog_array_map_poke_run,
+  1369 	.map_get_next_key = bpf_array_get_next_key,
+  1370 	.map_lookup_elem = fd_array_map_lookup_elem,
+  1371 	.map_delete_elem = fd_array_map_delete_elem,
+  1372 	.map_fd_get_ptr = prog_fd_array_get_ptr,
+  1373 	.map_fd_put_ptr = prog_fd_array_put_ptr,
+  1374 	.map_fd_sys_lookup_elem = prog_fd_array_sys_lookup_elem,
+  1375 	.map_release_uref = prog_array_map_clear,
+  1376 	.map_seq_show_elem = prog_array_map_seq_show_elem,
+  1377 	.map_mem_usage = array_map_mem_usage,
+  1378 	.map_btf_id = &array_map_btf_ids[0],
+  1379 };
+  1380 
+  1381 static struct bpf_event_entry *bpf_event_entry_gen(struct file *perf_file,
+  1382 						   struct file *map_file)
+  1383 {
+  1384 	struct bpf_event_entry *ee;
+  1385 
+  1386 	ee = kzalloc_obj(*ee);
+  1387 	if (ee) {
+  1388 		ee->event = perf_file->private_data;
+  1389 		ee->perf_file = perf_file;
+  1390 		ee->map_file = map_file;
+  1391 	}
+  1392 
+  1393 	return ee;
+  1394 }
+  1395 
+  1396 static void __bpf_event_entry_free(struct rcu_head *rcu)
+  1397 {
+  1398 	struct bpf_event_entry *ee;
+  1399 
+  1400 	ee = container_of(rcu, struct bpf_event_entry, rcu);
+  1401 	fput(ee->perf_file);
+  1402 	kfree(ee);
+  1403 }
+---
+
+===== Program-array teardown and uref cleanup (matches=2) =====
+  1305 					   work)->map;
+  1306 	bpf_fd_array_map_clear(map, true);
+  1307 	bpf_map_put(map);
+  1308 }
+  1309 
+  1310 static void prog_array_map_clear(struct bpf_map *map)
+  1311 {
+  1312 	struct bpf_array_aux *aux = container_of(map, struct bpf_array,
+  1313 						 map)->aux;
+  1314 	bpf_map_inc(map);
+  1315 	schedule_work(&aux->work);
+  1316 }
+  1317 
+  1318 static struct bpf_map *prog_array_map_alloc(union bpf_attr *attr)
+  1319 {
+  1320 	struct bpf_array_aux *aux;
+  1321 	struct bpf_map *map;
+  1322 
+  1323 	aux = kzalloc_obj(*aux, GFP_KERNEL_ACCOUNT);
+  1324 	if (!aux)
+  1325 		return ERR_PTR(-ENOMEM);
+  1326 
+  1327 	INIT_WORK(&aux->work, prog_array_map_clear_deferred);
+  1328 	INIT_LIST_HEAD(&aux->poke_progs);
+  1329 	mutex_init(&aux->poke_mutex);
+  1330 
+  1331 	map = array_map_alloc(attr);
+  1332 	if (IS_ERR(map)) {
+  1333 		kfree(aux);
+  1334 		return map;
+  1335 	}
+  1336 
+  1337 	container_of(map, struct bpf_array, map)->aux = aux;
+  1338 	aux->map = map;
+  1339 
+  1340 	return map;
+  1341 }
+  1342 
+  1343 static void prog_array_map_free(struct bpf_map *map)
+  1344 {
+  1345 	struct prog_poke_elem *elem, *tmp;
+  1346 	struct bpf_array_aux *aux;
+  1347 
+  1348 	aux = container_of(map, struct bpf_array, map)->aux;
+  1349 	list_for_each_entry_safe(elem, tmp, &aux->poke_progs, list) {
+  1350 		list_del_init(&elem->list);
+  1351 		kfree(elem);
+  1352 	}
+  1353 	kfree(aux);
+  1354 	fd_array_map_free(map);
+  1355 }
+  1356 
+  1357 /* prog_array->aux->{type,jited} is a runtime binding.
+  1358  * Doing static check alone in the verifier is not enough.
+  1359  * Thus, prog_array_map cannot be used as an inner_map
+  1360  * and map_meta_equal is not implemented.
+  1361  */
+  1362 const struct bpf_map_ops prog_array_map_ops = {
+  1363 	.map_alloc_check = fd_array_map_alloc_check,
+  1364 	.map_alloc = prog_array_map_alloc,
+  1365 	.map_free = prog_array_map_free,
+  1366 	.map_poke_track = prog_array_map_poke_track,
+  1367 	.map_poke_untrack = prog_array_map_poke_untrack,
+  1368 	.map_poke_run = prog_array_map_poke_run,
+  1369 	.map_get_next_key = bpf_array_get_next_key,
+  1370 	.map_lookup_elem = fd_array_map_lookup_elem,
+  1371 	.map_delete_elem = fd_array_map_delete_elem,
+  1372 	.map_fd_get_ptr = prog_fd_array_get_ptr,
+  1373 	.map_fd_put_ptr = prog_fd_array_put_ptr,
+  1374 	.map_fd_sys_lookup_elem = prog_fd_array_sys_lookup_elem,
+  1375 	.map_release_uref = prog_array_map_clear,
+  1376 	.map_seq_show_elem = prog_array_map_seq_show_elem,
+  1377 	.map_mem_usage = array_map_mem_usage,
+  1378 	.map_btf_id = &array_map_btf_ids[0],
+  1379 };
+  1380 
+  1381 static struct bpf_event_entry *bpf_event_entry_gen(struct file *perf_file,
+  1382 						   struct file *map_file)
+  1383 {
+  1384 	struct bpf_event_entry *ee;
+  1385 
+  1386 	ee = kzalloc_obj(*ee);
+  1387 	if (ee) {
+  1388 		ee->event = perf_file->private_data;
+  1389 		ee->perf_file = perf_file;
+  1390 		ee->map_file = map_file;
+  1391 	}
+  1392 
+  1393 	return ee;
+  1394 }
+  1395 
+  1396 static void __bpf_event_entry_free(struct rcu_head *rcu)
+  1397 {
+  1398 	struct bpf_event_entry *ee;
+  1399 
+  1400 	ee = container_of(rcu, struct bpf_event_entry, rcu);
+---
+  1338 	aux->map = map;
+  1339 
+  1340 	return map;
+  1341 }
+  1342 
+  1343 static void prog_array_map_free(struct bpf_map *map)
+  1344 {
+  1345 	struct prog_poke_elem *elem, *tmp;
+  1346 	struct bpf_array_aux *aux;
+  1347 
+  1348 	aux = container_of(map, struct bpf_array, map)->aux;
+  1349 	list_for_each_entry_safe(elem, tmp, &aux->poke_progs, list) {
+  1350 		list_del_init(&elem->list);
+  1351 		kfree(elem);
+  1352 	}
+  1353 	kfree(aux);
+  1354 	fd_array_map_free(map);
+  1355 }
+  1356 
+  1357 /* prog_array->aux->{type,jited} is a runtime binding.
+  1358  * Doing static check alone in the verifier is not enough.
+  1359  * Thus, prog_array_map cannot be used as an inner_map
+  1360  * and map_meta_equal is not implemented.
+  1361  */
+  1362 const struct bpf_map_ops prog_array_map_ops = {
+  1363 	.map_alloc_check = fd_array_map_alloc_check,
+  1364 	.map_alloc = prog_array_map_alloc,
+  1365 	.map_free = prog_array_map_free,
+  1366 	.map_poke_track = prog_array_map_poke_track,
+  1367 	.map_poke_untrack = prog_array_map_poke_untrack,
+  1368 	.map_poke_run = prog_array_map_poke_run,
+  1369 	.map_get_next_key = bpf_array_get_next_key,
+  1370 	.map_lookup_elem = fd_array_map_lookup_elem,
+  1371 	.map_delete_elem = fd_array_map_delete_elem,
+  1372 	.map_fd_get_ptr = prog_fd_array_get_ptr,
+  1373 	.map_fd_put_ptr = prog_fd_array_put_ptr,
+  1374 	.map_fd_sys_lookup_elem = prog_fd_array_sys_lookup_elem,
+  1375 	.map_release_uref = prog_array_map_clear,
+  1376 	.map_seq_show_elem = prog_array_map_seq_show_elem,
+  1377 	.map_mem_usage = array_map_mem_usage,
+  1378 	.map_btf_id = &array_map_btf_ids[0],
+  1379 };
+  1380 
+  1381 static struct bpf_event_entry *bpf_event_entry_gen(struct file *perf_file,
+  1382 						   struct file *map_file)
+  1383 {
+  1384 	struct bpf_event_entry *ee;
+  1385 
+  1386 	ee = kzalloc_obj(*ee);
+  1387 	if (ee) {
+  1388 		ee->event = perf_file->private_data;
+  1389 		ee->perf_file = perf_file;
+  1390 		ee->map_file = map_file;
+  1391 	}
+  1392 
+  1393 	return ee;
+  1394 }
+  1395 
+  1396 static void __bpf_event_entry_free(struct rcu_head *rcu)
+  1397 {
+  1398 	struct bpf_event_entry *ee;
+  1399 
+  1400 	ee = container_of(rcu, struct bpf_event_entry, rcu);
+  1401 	fput(ee->perf_file);
+  1402 	kfree(ee);
+  1403 }
+  1404 
+  1405 static void bpf_event_entry_free_rcu(struct bpf_event_entry *ee)
+  1406 {
+  1407 	call_rcu(&ee->rcu, __bpf_event_entry_free);
+  1408 }
+  1409 
+  1410 static void *perf_event_fd_array_get_ptr(struct bpf_map *map,
+  1411 					 struct file *map_file, int fd)
+  1412 {
+  1413 	struct bpf_event_entry *ee;
+  1414 	struct perf_event *event;
+  1415 	struct file *perf_file;
+  1416 	u64 value;
+  1417 
+  1418 	perf_file = perf_event_get(fd);
+  1419 	if (IS_ERR(perf_file))
+  1420 		return perf_file;
+  1421 
+  1422 	ee = ERR_PTR(-EOPNOTSUPP);
+  1423 	event = perf_file->private_data;
+  1424 	if (perf_event_read_local(event, &value, NULL, NULL) == -EOPNOTSUPP)
+  1425 		goto err_out;
+  1426 
+  1427 	ee = bpf_event_entry_gen(perf_file, map_file);
+  1428 	if (ee)
+  1429 		return ee;
+  1430 	ee = ERR_PTR(-ENOMEM);
+  1431 err_out:
+  1432 	fput(perf_file);
+  1433 	return ee;
+---
+
+===== FD-array clear operations (matches=1) =====
+  1151 static u32 prog_fd_array_sys_lookup_elem(void *ptr)
+  1152 {
+  1153 	return ((struct bpf_prog *)ptr)->aux->id;
+  1154 }
+  1155 
+  1156 /* decrement refcnt of all bpf_progs that are stored in this map */
+  1157 static void bpf_fd_array_map_clear(struct bpf_map *map, bool need_defer)
+  1158 {
+  1159 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+  1160 	int i;
+  1161 
+  1162 	for (i = 0; i < array->map.max_entries; i++) {
+  1163 		__fd_array_map_delete_elem(map, &i, need_defer);
+  1164 		cond_resched();
+  1165 	}
+  1166 }
+  1167 
+  1168 static void prog_array_map_seq_show_elem(struct bpf_map *map, void *key,
+  1169 					 struct seq_file *m)
+  1170 {
+  1171 	void **elem, *ptr;
+  1172 	u32 prog_id;
+  1173 
+  1174 	rcu_read_lock();
+  1175 
+  1176 	elem = array_map_lookup_elem(map, key);
+  1177 	if (elem) {
+  1178 		ptr = READ_ONCE(*elem);
+  1179 		if (ptr) {
+  1180 			seq_printf(m, "%u: ", *(u32 *)key);
+  1181 			prog_id = prog_fd_array_sys_lookup_elem(ptr);
+  1182 			btf_type_seq_show(map->btf, map->btf_value_type_id,
+  1183 					  &prog_id, m);
+  1184 			seq_putc(m, '\n');
+  1185 		}
+  1186 	}
+  1187 
+  1188 	rcu_read_unlock();
+  1189 }
+  1190 
+  1191 struct prog_poke_elem {
+  1192 	struct list_head list;
+  1193 	struct bpf_prog_aux *aux;
+  1194 };
+  1195 
+  1196 static int prog_array_map_poke_track(struct bpf_map *map,
+  1197 				     struct bpf_prog_aux *prog_aux)
+  1198 {
+  1199 	struct prog_poke_elem *elem;
+  1200 	struct bpf_array_aux *aux;
+  1201 	int ret = 0;
+  1202 
+  1203 	aux = container_of(map, struct bpf_array, map)->aux;
+  1204 	mutex_lock(&aux->poke_mutex);
+  1205 	list_for_each_entry(elem, &aux->poke_progs, list) {
+  1206 		if (elem->aux == prog_aux)
+  1207 			goto out;
+  1208 	}
+  1209 
+  1210 	elem = kmalloc_obj(*elem);
+  1211 	if (!elem) {
+  1212 		ret = -ENOMEM;
+  1213 		goto out;
+  1214 	}
+  1215 
+  1216 	INIT_LIST_HEAD(&elem->list);
+  1217 	/* We must track the program's aux info at this point in time
+  1218 	 * since the program pointer itself may not be stable yet, see
+  1219 	 * also comment in prog_array_map_poke_run().
+  1220 	 */
+  1221 	elem->aux = prog_aux;
+  1222 
+  1223 	list_add_tail(&elem->list, &aux->poke_progs);
+  1224 out:
+  1225 	mutex_unlock(&aux->poke_mutex);
+  1226 	return ret;
+  1227 }
+  1228 
+  1229 static void prog_array_map_poke_untrack(struct bpf_map *map,
+  1230 					struct bpf_prog_aux *prog_aux)
+  1231 {
+  1232 	struct prog_poke_elem *elem, *tmp;
+  1233 	struct bpf_array_aux *aux;
+---
+
+===== Update operations (matches=1) =====
+   980 		memcpy(evidence->digest, array->aux->bpfseal_digest,
+   981 		       SHA256_DIGEST_SIZE);
+   982 	mutex_unlock(&array->aux->poke_mutex);
+   983 	return 0;
+   984 }
+   985 
+   986 int bpf_fd_array_map_update_elem(struct bpf_map *map, struct file *map_file,
+   987 				 void *key, void *value, u64 map_flags)
+   988 {
+   989 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+   990 	void *new_ptr, *old_ptr;
+   991 	u32 index = *(u32 *)key, ufd;
+   992 	u64 bpfseal_gen = 0; /* BPFSEAL_ITER1B */
+   993 	u8 bpfseal_digest[SHA256_DIGEST_SIZE]; /* BPFSEAL_ITER1C */
+   994 	bool bpfseal_digest_valid = false;
+   995 
+   996 	if (map_flags != BPF_ANY)
+   997 		return -EINVAL;
+   998 
+   999 	if (index >= array->map.max_entries)
+  1000 		return -E2BIG;
+  1001 
+  1002 	ufd = *(u32 *)value;
+  1003 	new_ptr = map->ops->map_fd_get_ptr(map, map_file, ufd);
+  1004 	if (IS_ERR(new_ptr))
+  1005 		return PTR_ERR(new_ptr);
+  1006 
+  1007 	if (map->ops->map_poke_run) {
+  1008 		mutex_lock(&array->aux->poke_mutex);
+  1009 		old_ptr = xchg(array->ptrs + index, new_ptr);
+  1010 		map->ops->map_poke_run(map, index, old_ptr, new_ptr);
+  1011 		/* BPFSEAL_ITER1B: ordered within this PROG_ARRAY. */
+  1012 		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY)
+  1013 			bpfseal_gen = ++array->aux->bpfseal_generation;
+  1014 		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
+  1015 			bpfseal_digest_valid = bpfseal_iter1c_digest(array);
+  1016 			if (bpfseal_digest_valid)
+  1017 				memcpy(bpfseal_digest, array->aux->bpfseal_digest,
+  1018 				       SHA256_DIGEST_SIZE);
+  1019 		}
+  1020 		mutex_unlock(&array->aux->poke_mutex);
+  1021 	} else {
+  1022 		old_ptr = xchg(array->ptrs + index, new_ptr);
+  1023 	}
+  1024 
+  1025 	/* BPFSEAL_ITER1A: diagnostic event only; not atomic attestation. */
+  1026 	if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
+  1027 		struct bpf_prog *before = old_ptr;
+  1028 		struct bpf_prog *after = new_ptr;
+  1029 
+  1030 		pr_info("BPFSEAL_ITER1A BPFSEAL_ITER1B update map=%u slot=%u old=%u new=%u gen=%llu\n",
+  1031 			map->id, index,
+  1032 			before ? before->aux->id : 0,
+  1033 			after ? after->aux->id : 0,
+  1034 			(unsigned long long)bpfseal_gen);
+  1035 	}
+  1036 
+  1037 	/* BPFSEAL_ITER1C: digest captured while mutex was held. */
+  1038 	if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY && bpfseal_digest_valid)
+  1039 		pr_info("BPFSEAL_ITER1C update map=%u cookie=%llu gen=%llu digest=%*phN\n",
+  1040 			map->id,
+  1041 			(unsigned long long)map->cookie,
+  1042 			(unsigned long long)bpfseal_gen,
+  1043 			SHA256_DIGEST_SIZE, bpfseal_digest);
+  1044 	if (old_ptr)
+  1045 		map->ops->map_fd_put_ptr(map, old_ptr, true);
+  1046 	return 0;
+  1047 }
+  1048 
+  1049 static long __fd_array_map_delete_elem(struct bpf_map *map, void *key, bool need_defer)
+  1050 {
+  1051 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+  1052 	void *old_ptr;
+  1053 	u32 index = *(u32 *)key;
+  1054 	u64 bpfseal_gen = 0; /* BPFSEAL_ITER1B */
+  1055 	u8 bpfseal_digest[SHA256_DIGEST_SIZE]; /* BPFSEAL_ITER1C */
+  1056 	bool bpfseal_digest_valid = false;
+  1057 
+  1058 	if (index >= array->map.max_entries)
+  1059 		return -E2BIG;
+  1060 
+  1061 	if (map->ops->map_poke_run) {
+  1062 		mutex_lock(&array->aux->poke_mutex);
+  1063 		old_ptr = xchg(array->ptrs + index, NULL);
+  1064 		map->ops->map_poke_run(map, index, old_ptr, NULL);
+  1065 		/* BPFSEAL_ITER1B: failed empty-slot deletes do not advance. */
+  1066 		if (old_ptr && map->map_type == BPF_MAP_TYPE_PROG_ARRAY)
+  1067 			bpfseal_gen = ++array->aux->bpfseal_generation;
+  1068 		if (old_ptr && map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
+  1069 			bpfseal_digest_valid = bpfseal_iter1c_digest(array);
+  1070 			if (bpfseal_digest_valid)
+  1071 				memcpy(bpfseal_digest, array->aux->bpfseal_digest,
+  1072 				       SHA256_DIGEST_SIZE);
+  1073 		}
+  1074 		mutex_unlock(&array->aux->poke_mutex);
+  1075 	} else {
+  1076 		old_ptr = xchg(array->ptrs + index, NULL);
+  1077 	}
+  1078 
+  1079 	if (old_ptr) {
+  1080 		/* BPFSEAL_ITER1A: diagnostic event on successful removal. */
+  1081 		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
+  1082 			struct bpf_prog *before = old_ptr;
+  1083 
+  1084 			pr_info("BPFSEAL_ITER1A BPFSEAL_ITER1B delete map=%u slot=%u old=%u new=0 gen=%llu\n",
+  1085 				map->id, index, before->aux->id,
+  1086 				(unsigned long long)bpfseal_gen);
+  1087 		}
+  1088 		/* BPFSEAL_ITER1C: no digest is published for empty deletes. */
+  1089 		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY && bpfseal_digest_valid)
+  1090 			pr_info("BPFSEAL_ITER1C delete map=%u cookie=%llu gen=%llu digest=%*phN\n",
+  1091 				map->id,
+  1092 				(unsigned long long)map->cookie,
+  1093 				(unsigned long long)bpfseal_gen,
+  1094 				SHA256_DIGEST_SIZE, bpfseal_digest);
+  1095 		map->ops->map_fd_put_ptr(map, old_ptr, need_defer);
+  1096 		return 0;
+  1097 	} else {
+  1098 		return -ENOENT;
+  1099 	}
+  1100 }
+  1101 
+  1102 static long fd_array_map_delete_elem(struct bpf_map *map, void *key)
+  1103 {
+  1104 	return __fd_array_map_delete_elem(map, key, true);
+  1105 }
+  1106 
+  1107 static void *prog_fd_array_get_ptr(struct bpf_map *map,
+  1108 				   struct file *map_file, int fd)
+  1109 {
+  1110 	struct bpf_prog *prog = bpf_prog_get(fd);
+  1111 	bool is_extended;
+---
+
+===== Delete operations (matches=1) =====
+  1043 			SHA256_DIGEST_SIZE, bpfseal_digest);
+  1044 	if (old_ptr)
+  1045 		map->ops->map_fd_put_ptr(map, old_ptr, true);
+  1046 	return 0;
+  1047 }
+  1048 
+  1049 static long __fd_array_map_delete_elem(struct bpf_map *map, void *key, bool need_defer)
+  1050 {
+  1051 	struct bpf_array *array = container_of(map, struct bpf_array, map);
+  1052 	void *old_ptr;
+  1053 	u32 index = *(u32 *)key;
+  1054 	u64 bpfseal_gen = 0; /* BPFSEAL_ITER1B */
+  1055 	u8 bpfseal_digest[SHA256_DIGEST_SIZE]; /* BPFSEAL_ITER1C */
+  1056 	bool bpfseal_digest_valid = false;
+  1057 
+  1058 	if (index >= array->map.max_entries)
+  1059 		return -E2BIG;
+  1060 
+  1061 	if (map->ops->map_poke_run) {
+  1062 		mutex_lock(&array->aux->poke_mutex);
+  1063 		old_ptr = xchg(array->ptrs + index, NULL);
+  1064 		map->ops->map_poke_run(map, index, old_ptr, NULL);
+  1065 		/* BPFSEAL_ITER1B: failed empty-slot deletes do not advance. */
+  1066 		if (old_ptr && map->map_type == BPF_MAP_TYPE_PROG_ARRAY)
+  1067 			bpfseal_gen = ++array->aux->bpfseal_generation;
+  1068 		if (old_ptr && map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
+  1069 			bpfseal_digest_valid = bpfseal_iter1c_digest(array);
+  1070 			if (bpfseal_digest_valid)
+  1071 				memcpy(bpfseal_digest, array->aux->bpfseal_digest,
+  1072 				       SHA256_DIGEST_SIZE);
+  1073 		}
+  1074 		mutex_unlock(&array->aux->poke_mutex);
+  1075 	} else {
+  1076 		old_ptr = xchg(array->ptrs + index, NULL);
+  1077 	}
+  1078 
+  1079 	if (old_ptr) {
+  1080 		/* BPFSEAL_ITER1A: diagnostic event on successful removal. */
+  1081 		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY) {
+  1082 			struct bpf_prog *before = old_ptr;
+  1083 
+  1084 			pr_info("BPFSEAL_ITER1A BPFSEAL_ITER1B delete map=%u slot=%u old=%u new=0 gen=%llu\n",
+  1085 				map->id, index, before->aux->id,
+  1086 				(unsigned long long)bpfseal_gen);
+  1087 		}
+  1088 		/* BPFSEAL_ITER1C: no digest is published for empty deletes. */
+  1089 		if (map->map_type == BPF_MAP_TYPE_PROG_ARRAY && bpfseal_digest_valid)
+  1090 			pr_info("BPFSEAL_ITER1C delete map=%u cookie=%llu gen=%llu digest=%*phN\n",
+  1091 				map->id,
+  1092 				(unsigned long long)map->cookie,
+  1093 				(unsigned long long)bpfseal_gen,
+  1094 				SHA256_DIGEST_SIZE, bpfseal_digest);
+  1095 		map->ops->map_fd_put_ptr(map, old_ptr, need_defer);
+  1096 		return 0;
+  1097 	} else {
+  1098 		return -ENOENT;
+  1099 	}
+  1100 }
+  1101 
+  1102 static long fd_array_map_delete_elem(struct bpf_map *map, void *key)
+  1103 {
+  1104 	return __fd_array_map_delete_elem(map, key, true);
+  1105 }
+  1106 
+  1107 static void *prog_fd_array_get_ptr(struct bpf_map *map,
+  1108 				   struct file *map_file, int fd)
+  1109 {
+  1110 	struct bpf_prog *prog = bpf_prog_get(fd);
+  1111 	bool is_extended;
+  1112 
+  1113 	if (IS_ERR(prog))
+  1114 		return prog;
+  1115 
+  1116 	if (prog->type == BPF_PROG_TYPE_EXT ||
+  1117 	    !bpf_prog_map_compatible(map, prog)) {
+  1118 		bpf_prog_put(prog);
+  1119 		return ERR_PTR(-EINVAL);
+  1120 	}
+  1121 
+  1122 	mutex_lock(&prog->aux->ext_mutex);
+  1123 	is_extended = prog->aux->is_extended;
+  1124 	if (!is_extended)
+  1125 		prog->aux->prog_array_member_cnt++;
+  1126 	mutex_unlock(&prog->aux->ext_mutex);
+  1127 	if (is_extended) {
+  1128 		/* Extended prog can not be tail callee. It's to prevent a
+  1129 		 * potential infinite loop like:
+  1130 		 * tail callee prog entry -> tail callee prog subprog ->
+  1131 		 * freplace prog entry --tailcall-> tail callee prog entry.
+  1132 		 */
+  1133 		bpf_prog_put(prog);
+  1134 		return ERR_PTR(-EBUSY);
+  1135 	}
+  1136 
+  1137 	return prog;
+  1138 }
+  1139 
+  1140 static void prog_fd_array_put_ptr(struct bpf_map *map, void *ptr, bool need_defer)
+  1141 {
+  1142 	struct bpf_prog *prog = ptr;
+  1143 
+  1144 	mutex_lock(&prog->aux->ext_mutex);
+  1145 	prog->aux->prog_array_member_cnt--;
+  1146 	mutex_unlock(&prog->aux->ext_mutex);
+  1147 	/* bpf_prog is freed after one RCU or tasks trace grace period */
+  1148 	bpf_prog_put(prog);
+  1149 }
+---
+
+===== PROG_ARRAY map-ops table (matches=1) =====
+  1357 /* prog_array->aux->{type,jited} is a runtime binding.
+  1358  * Doing static check alone in the verifier is not enough.
+  1359  * Thus, prog_array_map cannot be used as an inner_map
+  1360  * and map_meta_equal is not implemented.
+  1361  */
+  1362 const struct bpf_map_ops prog_array_map_ops = {
+  1363 	.map_alloc_check = fd_array_map_alloc_check,
+  1364 	.map_alloc = prog_array_map_alloc,
+  1365 	.map_free = prog_array_map_free,
+  1366 	.map_poke_track = prog_array_map_poke_track,
+  1367 	.map_poke_untrack = prog_array_map_poke_untrack,
+  1368 	.map_poke_run = prog_array_map_poke_run,
+  1369 	.map_get_next_key = bpf_array_get_next_key,
+  1370 	.map_lookup_elem = fd_array_map_lookup_elem,
+  1371 	.map_delete_elem = fd_array_map_delete_elem,
+  1372 	.map_fd_get_ptr = prog_fd_array_get_ptr,
+  1373 	.map_fd_put_ptr = prog_fd_array_put_ptr,
+  1374 	.map_fd_sys_lookup_elem = prog_fd_array_sys_lookup_elem,
+  1375 	.map_release_uref = prog_array_map_clear,
+  1376 	.map_seq_show_elem = prog_array_map_seq_show_elem,
+  1377 	.map_mem_usage = array_map_mem_usage,
+  1378 	.map_btf_id = &array_map_btf_ids[0],
+  1379 };
+  1380 
+  1381 static struct bpf_event_entry *bpf_event_entry_gen(struct file *perf_file,
+  1382 						   struct file *map_file)
+  1383 {
+  1384 	struct bpf_event_entry *ee;
+  1385 
+  1386 	ee = kzalloc_obj(*ee);
+  1387 	if (ee) {
+  1388 		ee->event = perf_file->private_data;
+  1389 		ee->perf_file = perf_file;
+  1390 		ee->map_file = map_file;
+  1391 	}
+  1392 
+  1393 	return ee;
+  1394 }
+  1395 
+---
+
+===== QUICK CHECKS =====
+FOUND: BPF_OBJ_GET_INFO_BY_FD dispatcher
+FOUND: Map information handler
+FOUND: Map FD retrieval and lifetime
+FOUND: Map release/file-ops
+FOUND: Map UAPI structure
+FOUND: BPFSeal evidence type and helper declaration
+FOUND: BPFSeal synchronized snapshot helper
+FOUND: Program-array allocation
+FOUND: Program-array teardown and uref cleanup
+FOUND: FD-array clear operations
+FOUND: Update operations
+FOUND: Delete operations
+FOUND: PROG_ARRAY map-ops table
+
+NOTE: This audit reports code locations, NOT evidence of correct lifetime, synchronization or API security.

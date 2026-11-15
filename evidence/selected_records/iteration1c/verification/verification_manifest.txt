@@ -1,0 +1,11 @@
+BPFSeal Iteration 1C — independent SHA-256 verification
+Mon Nov  2 19:31:24 UTC 2026
+Linux ip-172-31-32-229 7.0.0-2003-aws #14~24.04.1 SMP PREEMPT Mon Nov  2 19:08:37 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+df98985efdb1b480c1a4d8d1d3d8efcf4316e643ca1ea2a6dfe581d98a2d7feb  results/iteration1c/verification/restore_with_info.txt
+e4974d236c9767a42b59965f959520023adf62a6eb7684d5335e2ddf36eb3062  results/iteration1c/verification/restore_with_info_events.txt
+gen=1 state=A SHA256=PASS calculated=9fb88c8c63dd1aeba36343e08a87b2f21eaced502b32f49375f43b74f9d3ca4b kernel=9fb88c8c63dd1aeba36343e08a87b2f21eaced502b32f49375f43b74f9d3ca4b
+gen=2 state=A SHA256=PASS calculated=9fb88c8c63dd1aeba36343e08a87b2f21eaced502b32f49375f43b74f9d3ca4b kernel=9fb88c8c63dd1aeba36343e08a87b2f21eaced502b32f49375f43b74f9d3ca4b
+gen=3 state=B SHA256=PASS calculated=a1ad3c3dbb42e3ca6e13e797887e685fd66a9ad243c02a0c888c8a5463297655 kernel=a1ad3c3dbb42e3ca6e13e797887e685fd66a9ad243c02a0c888c8a5463297655
+gen=4 state=A SHA256=PASS calculated=9fb88c8c63dd1aeba36343e08a87b2f21eaced502b32f49375f43b74f9d3ca4b kernel=9fb88c8c63dd1aeba36343e08a87b2f21eaced502b32f49375f43b74f9d3ca4b
+gen=5 state=empty SHA256=PASS calculated=c5f7a6a07b5bead6659d0b50e08cbceca0d48854173a79a1ddab8b40a61fa018 kernel=c5f7a6a07b5bead6659d0b50e08cbceca0d48854173a79a1ddab8b40a61fa018
+INDEPENDENT_VERIFICATION: PASS

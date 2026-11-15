@@ -1,0 +1,8 @@
+phase,caller_id,caller_tag,slot_target,returned_action
+empty,805,f8cfbc089f5bb3ed,none,1
+target_pass,805,f8cfbc089f5bb3ed,XDP_PASS,2
+target_tx,805,f8cfbc089f5bb3ed,XDP_TX,3
+deleted,805,f8cfbc089f5bb3ed,none,1
+caller_identity_unchanged=PASS
+execution_changed_with_map_update=PASS
+execution_restored_after_delete=PASS

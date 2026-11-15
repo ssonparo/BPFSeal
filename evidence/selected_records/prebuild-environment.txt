@@ -1,0 +1,16 @@
+Mon Nov  2 04:15:24 UTC 2026
+Linux ip-172-31-32-229 7.0.0-1014-aws #14~24.04.1-Ubuntu SMP PREEMPT Fri Sep 18 21:24:59 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+linux-aws-7.0 (7.0.0-1014.14~24.04.1) noble; urgency=medium
+
+  * noble/linux-aws-7.0: 7.0.0-1014.14~24.04.1 -proposed tracker (LP: #2165457)
+
+  [ Ubuntu-aws: 7.0.0-1014.14 ]
+# SPDX-License-Identifier: GPL-2.0
+VERSION = 7
+PATCHLEVEL = 0
+SUBLEVEL = 14
+EXTRAVERSION =
+NAME = Baby Opossum Posse
+
+# *DOCUMENTATION*
+/home/ubuntu/bpfseal/kernel/linux-aws-7.0-bpfseal-build/debian

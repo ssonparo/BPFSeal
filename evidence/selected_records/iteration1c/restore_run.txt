@@ -1,0 +1,7 @@
+phase=A_first expected_gen=1
+phase=A_again expected_gen=2
+phase=B expected_gen=3
+phase=A_restored expected_gen=4
+phase=empty expected_gen=5
+empty_delete_result=-1 errno=2 expected_errno=2
+test_status=PASS

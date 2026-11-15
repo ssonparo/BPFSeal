@@ -1,0 +1,6 @@
+case,prog_id,prog_tag,map_id,jited_bytes
+same_map_load_1,21,3ff87e593d76e996,1,75
+same_map_load_2,22,3ff87e593d76e996,1,75
+different_map,23,3ff87e593d76e996,2,75
+separate_loads_same_tag=PASS
+different_maps_same_tag=PASS

@@ -1,0 +1,17 @@
+writers,kernel_variant,median_ops_per_second,provenance
+1,2004_bpfseal_logs,132530,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+4,2004_bpfseal_logs,350183,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+8,2004_bpfseal_logs,422590,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+16,2004_bpfseal_logs,451418,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+1,2005_unmodified,2247301,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+4,2005_unmodified,1948551,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+8,2005_unmodified,2008227,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+16,2005_unmodified,2205554,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+1,2006_bpfseal_nolog,740759,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+4,2006_bpfseal_nolog,761516,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+8,2006_bpfseal_nolog,769749,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+16,2006_bpfseal_nolog,750431,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+1,2007_nohash_nonsecurity,2085014.38,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+4,2007_nohash_nonsecurity,1708166.5,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+8,2007_nohash_nonsecurity,1818691.8,Operator-reported median; raw per-trial CSV files available on stopped EC2 only
+16,2007_nohash_nonsecurity,1862286.43,Operator-reported median; raw per-trial CSV files available on stopped EC2 only

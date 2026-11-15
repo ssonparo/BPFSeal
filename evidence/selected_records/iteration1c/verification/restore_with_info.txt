@@ -1,0 +1,10 @@
+map_id=2 max_entries=1
+program=A tag=614b434cd8324ecc load_time=171224815712 id=23
+program=B tag=79aa95555f6b99c7 load_time=171224868507 id=24
+phase=A_first expected_gen=1
+phase=A_again expected_gen=2
+phase=B expected_gen=3
+phase=A_restored expected_gen=4
+phase=empty expected_gen=5
+empty_delete_result=-1 errno=2 expected_errno=2
+test_status=PASS

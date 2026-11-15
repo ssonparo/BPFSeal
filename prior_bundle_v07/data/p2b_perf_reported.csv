@@ -1,0 +1,7 @@
+writers,symbol,percent_of_on_cpu_samples,sample_description
+1,sha256_ni_transform,52.26,Reported perf record at 999 Hz on kernel 2006; not elapsed wall-time
+1,mutex_unlock,2.58,Reported perf record at 999 Hz on kernel 2006; not elapsed wall-time
+8,osq_lock,60.02,Reported perf record at 999 Hz on kernel 2006; not elapsed wall-time
+8,__raw_callee_save___kvm_vcpu_is_preempted,12.07,Reported perf record at 999 Hz on kernel 2006; not elapsed wall-time
+8,mutex_spin_on_owner,7.05,Reported perf record at 999 Hz on kernel 2006; not elapsed wall-time
+8,sha256_ni_transform,5.77,Reported perf record at 999 Hz on kernel 2006; not elapsed wall-time

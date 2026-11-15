@@ -1,0 +1,2 @@
+threads=4 ops_per_thread=16 successful_updates=64 failed_updates=0
+empty_delete_result=-1 errno=2 expected_errno=2

@@ -1,0 +1,18 @@
+=== UTC DATE ===
+Mon Nov  2 03:55:55 UTC 2026
+=== KERNEL ===
+Linux ip-172-31-32-229 7.0.0-1014-aws #14~24.04.1-Ubuntu SMP PREEMPT Fri Sep 18 21:24:59 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+=== TOOLS ===
+Ubuntu clang version 18.1.3 (1ubuntu1)
+bpftool v7.7.0
+using libbpf v1.7
+features:
+=== SOURCE HASHES ===
+b77805c73c9987d6fb313b84a041e7121ab677b49f2ec11f3b1ea080797fefc4  src/bpfseal_rq1_identity.c
+9a0d43bf2ec562e8f4f3f96e85408230efb9f33e689cdbe4e58abaeb0fb77b47  src/bpfseal_rq1_multihop.c
+3c38847da1011fdfd7b25131bace2fc18dd7ad7204f05a3f018719147f979284  src/bpfseal_rq1_tailcall.c
+=== RESULT HASHES ===
+7fb77fdc40f8717a5fd868c8161c1d53ec1b16216f35e397b3fe03f73d326d46  results/baseline/environment.txt
+7d2cb25e796f25b9ae64061f0d3e8bc76f3d7a22ff86f440fa2bbfc816af790c  results/baseline/rq1_identity.txt
+825244f6e057b3f49dee44798484b2109a7ab525eac497d9e808881b86affba1  results/baseline/rq1_multihop.txt
+06b15463e37d28428288231cfc8dc33f95cc64910bfc08673eeadab631e50d18  results/baseline/rq1_tailcall.txt

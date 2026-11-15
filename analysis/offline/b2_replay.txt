@@ -1,0 +1,6 @@
+generation_coverage=1602/1602 PASS
+trace_metadata_matches_program_info=PASS
+independent_sha256_commitments=1602/1602 PASS
+concurrent_writers=16 updates_per_writer=100
+ITERATION2B_STAGE_B2_16X100_SHA256: PASS
+full_16_writer_SHA256=PASS

@@ -1,0 +1,5 @@
+BPFSeal Iteration 1C — restoration validation
+Mon Nov  2 16:57:35 UTC 2026
+Linux ip-172-31-32-229 7.0.0-2002-aws #14~24.04.1 SMP PREEMPT Mon Nov  2 16:33:25 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+0d31b7c0cacbb0ccc4b41a8dc58ac2340eebbff2356865b5bfaeb0bf93abb9fe  results/iteration1c/restore_run.txt
+a6af54838dcbd227b59c62914265c86e1e47128c7976ac8ebf4ba2fdc4c8b686  results/iteration1c/restore_events.txt

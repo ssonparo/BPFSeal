@@ -1,0 +1,23 @@
+kfunc:bpfseal_iter1c_digest
+{
+    @array[tid] = (uint64)args.array;
+}
+kretfunc:bpfseal_iter1c_digest
+/@array[tid]/
+{
+    $array = (struct bpf_array *)@array[tid];
+    $gen = $array->aux->bpfseal_generation;
+    $prog = (struct bpf_prog *)$array->ptrs[0];
+    @seen[$gen] = count();
+    @valid[$gen] = (uint64)$array->aux->bpfseal_digest_valid;
+    @digest[$gen] = buf($array->aux->bpfseal_digest, 32);
+    if ($prog != 0) {
+        @program_id[$gen] = (uint64)$prog->aux->id;
+        @load_time[$gen] = (uint64)$prog->aux->load_time;
+        @tag[$gen] = buf($prog->tag, 8);
+    } else {
+        @program_id[$gen] = 0;
+        @load_time[$gen] = 0;
+    }
+    delete(@array[tid]);
+}

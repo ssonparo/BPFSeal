@@ -1,0 +1,6 @@
+BPFSeal Iteration 1C — initial SHA-256 test
+Mon Nov  2 16:54:03 UTC 2026
+Linux ip-172-31-32-229 7.0.0-2002-aws #14~24.04.1 SMP PREEMPT Mon Nov  2 16:33:25 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+d0b0b5803bacd06a9772cd33354fae58052e813ce03d6c5f9a0d3bbe5257c74c  results/iteration1c/tailcall.txt
+ae4e5de428dfa80e6e7c570b81359025a048289135011a5c398421e734ad092d  results/iteration1c/multihop.txt
+7d607b8b1d2ba97ea72756bd1905b5a3ea97e1674fabd73d8e3386a0c9d3335a  results/iteration1c/digest_events.txt

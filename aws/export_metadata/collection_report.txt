@@ -1,0 +1,27 @@
+BPFSeal read-only artifact collection
+UTC: 20261103T185318Z
+Booted kernel: 7.0.0-2003-aws (does not need to be the experimental kernel)
+Root: /home/ubuntu/bpfseal
+
+SOURCE 2004: kernel/linux-aws-7.0-bpfseal-patched
+SOURCE 2005: kernel/linux-aws-7.0-baseline-2005
+SOURCE 2006: kernel/linux-aws-7.0-bpfseal-nolog-2006
+SOURCE 2007: kernel/linux-aws-7.0-bpfseal-nohash-2007
+PATCH 2004: 9630 bytes
+PATCH 2006: 9638 bytes
+PATCH 2007: 9695 bytes
+
+IMPORTANT DATA PATH CHECKS
+  FOUND: results/performance/p1/full_matrix_20261102T225927Z/summary.csv
+  FOUND: results/performance/p1/full_matrix_20261103T101544Z/summary.csv
+  FOUND: results/performance/p1/full_matrix_20261103T143835Z/summary.csv
+  FOUND: results/performance/p1/full_matrix_20261103T161719Z/summary.csv
+  FOUND: results/iteration2b/final_archive/digest_full_16x100.txt
+  FOUND: results/iteration2b/final_archive/bpfseal_iter2b_independent_sha256_16x100_v2.py
+  FOUND: results/performance/p2b/perf_1writer.data
+  FOUND: results/performance/p2b/perf_8writers.data
+
+Input directory sizes (uncompressed):
+356K	experiments
+157M	results
+Creating archive: exports/BPFSeal_Evidence_20261103T185318Z.tar.gz

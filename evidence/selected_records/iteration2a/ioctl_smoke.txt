@@ -1,0 +1,6 @@
+snapshot_1 version=1 map_id=1 max_entries=1 cookie=1 gen=0 valid=0
+PASS repeated_snapshot
+PASS initial_generation_zero_invalid
+PASS invalid_buffer
+PASS unsupported_map
+BPFSEAL_ITER2A_IOCTL_SMOKE: PASS

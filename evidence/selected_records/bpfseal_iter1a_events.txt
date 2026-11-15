@@ -1,0 +1,7 @@
+[  428.025611] BPFSEAL_ITER1A update map=1 slot=0 old=0 new=27
+[  428.025646] BPFSEAL_ITER1A update map=1 slot=0 old=27 new=28
+[  428.033454] BPFSEAL_ITER1A delete map=1 slot=0 old=28 new=0
+[  428.043972] BPFSEAL_ITER1A update map=2 slot=0 old=0 new=32
+[  428.044031] BPFSEAL_ITER1A update map=3 slot=0 old=0 new=33
+[  428.044062] BPFSEAL_ITER1A update map=3 slot=0 old=33 new=34
+[  428.048764] BPFSEAL_ITER1A delete map=3 slot=0 old=34 new=0

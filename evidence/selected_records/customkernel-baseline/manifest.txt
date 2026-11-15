@@ -1,0 +1,10 @@
+UTC timestamp: Mon Nov  2 12:03:14 UTC 2026
+Kernel: 7.0.0-1999-aws
+Source version: 7.0.0-1999.14~24.04.1
+b77805c73c9987d6fb313b84a041e7121ab677b49f2ec11f3b1ea080797fefc4  src/bpfseal_rq1_identity.c
+9a0d43bf2ec562e8f4f3f96e85408230efb9f33e689cdbe4e58abaeb0fb77b47  src/bpfseal_rq1_multihop.c
+3c38847da1011fdfd7b25131bace2fc18dd7ad7204f05a3f018719147f979284  src/bpfseal_rq1_tailcall.c
+bbb37cf9358231b53ee8a72751f73addab51092ac6f70ea48152020e193420b3  results/customkernel-baseline/manifest.txt
+8b8a7e9e7768560856f62ce10f999ee9528be18f412ae78227b0a96ba8858515  results/customkernel-baseline/rq1_identity_customkernel.txt
+332927f0468cc162ebc34682eace35eaecad65c9b109e566d7eedd964c23e137  results/customkernel-baseline/rq1_multihop_customkernel.txt
+4999059b46c48bd1e3f9e9a9015168f959b52ec5a559885b869e782dfd03c665  results/customkernel-baseline/rq1_tailcall_customkernel.txt

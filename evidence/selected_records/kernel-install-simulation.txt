@@ -1,0 +1,18 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Suggested packages:
+  linux-perf linux-aws-7.0-doc-7.0.0 | linux-aws-7.0-source-7.0.0
+  linux-aws-7.0-tools
+The following NEW packages will be installed:
+  linux-aws-7.0-headers-7.0.0-1999 linux-headers-7.0.0-1999-aws
+  linux-image-unsigned-7.0.0-1999-aws linux-modules-7.0.0-1999-aws
+0 upgraded, 4 newly installed, 0 to remove and 8 not upgraded.
+Inst linux-aws-7.0-headers-7.0.0-1999 (7.0.0-1999.14~24.04.1 local-deb [all])
+Inst linux-headers-7.0.0-1999-aws (7.0.0-1999.14~24.04.1 local-deb [amd64])
+Inst linux-modules-7.0.0-1999-aws (7.0.0-1999.14~24.04.1 local-deb [amd64]) []
+Inst linux-image-unsigned-7.0.0-1999-aws (7.0.0-1999.14~24.04.1 local-deb [amd64])
+Conf linux-aws-7.0-headers-7.0.0-1999 (7.0.0-1999.14~24.04.1 local-deb [all])
+Conf linux-headers-7.0.0-1999-aws (7.0.0-1999.14~24.04.1 local-deb [amd64])
+Conf linux-modules-7.0.0-1999-aws (7.0.0-1999.14~24.04.1 local-deb [amd64])
+Conf linux-image-unsigned-7.0.0-1999-aws (7.0.0-1999.14~24.04.1 local-deb [amd64])

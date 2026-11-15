@@ -1,0 +1,39 @@
+{
+  "research_date": "2026-11-03",
+  "kind": "operator-reported EC2 evidence and accessible source artifact",
+  "host": "AWS EC2 m7i.2xlarge, Ubuntu 24.04.5, 8 vCPUs",
+  "source_sha256": "123f5061283803f35a52d218a7d476fa4b14c171d9a7085221f02df1d686f0d5",
+  "benchmark_binary_sha256_reported": "dafce9f9621a5c65eeb74df6ae5a8ce6d85345be58b24e06c56a8cb62ea4e0db",
+  "kernel_variants": {
+    "2003": "early integrity",
+    "2004": "BPFSeal logging",
+    "2005": "unmodified baseline",
+    "2006": "BPFSeal no logging",
+    "2007": "no-hash diagnostic, commitment invalid"
+  },
+  "runs": {
+    "2004": "20261102T225927Z",
+    "2005": "20261103T101544Z",
+    "2006": "20261103T143835Z",
+    "2007": "20261103T161719Z"
+  },
+  "raw_on_stopped_ec2": {
+    "b2_trace": "results/iteration2b/final_archive/digest_full_16x100.txt",
+    "b2_trace_sha256": "aa55992340955d268e2870e271bbbea3393782c90ecb7fadf2e0f3dcbbf7cb86",
+    "p2c_summary_sha256": "d1e436bcff01c29df7ff0d7fd4ae946e56b3605844e9425c14f9dbc0fd356a8f",
+    "p2c_runner_sha256": "33c9b8ed47afcc7bcc1c511b3c9545143ab9ff6295a21b4fa76d8a93c2bf951f",
+    "p2b_perf_1writer_sha256": "ddc40136d29db99509fc6b578dee346818a63496e8c0c90e689be2fd868b6dc2",
+    "p2b_perf_8writers_sha256": "02b513dfac34e4a351cb5f0173cadaddad44b6ac56026acb5430586676b5a714",
+    "p3a_results_log_sha256": "f4b7649ccefc74bfc9bc4c110eb8ac5a8f025197cf38657853b2129c4694d563",
+    "p3a_reference_log_sha256": "85251240e85f4c2a0a7d1f37b7bcc50d10a55cd9b48d261eba41e18a29cd3e58"
+  },
+  "missing_before_full_reproducibility": [
+    "exact kernel source/patch",
+    "full raw per-operation P1/P2 trials",
+    "complete B2 original trace",
+    "perf.data files",
+    "2007 runner copy",
+    "2005/2006 runner copies"
+  ],
+  "claims_are_not_independently_repeated": "Source checksum checks possible for included files; remaining results copied from user EC2 console and earlier paper."
+}

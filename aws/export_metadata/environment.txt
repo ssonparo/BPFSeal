@@ -1,0 +1,37 @@
+# Kernel / OS environment at export
+Linux ip-172-31-32-229 7.0.0-2003-aws #14~24.04.1 SMP PREEMPT Mon Nov  2 19:08:37 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+
+# Installed image/modules packages
+linux-image-unsigned-7.0.0-1014-aws	
+linux-image-unsigned-7.0.0-2003-aws	7.0.0-2003.14~24.04.1
+linux-image-unsigned-7.0.0-2004-aws	7.0.0-2004.14~24.04.1
+linux-image-unsigned-7.0.0-2005-aws	7.0.0-2005.14~24.04.1
+linux-image-unsigned-7.0.0-2006-aws	7.0.0-2006.14~24.04.1
+linux-image-unsigned-7.0.0-2007-aws	7.0.0-2007.14~24.04.1
+linux-modules-7.0.0-1014-aws	7.0.0-1014.14~24.04.1
+linux-modules-7.0.0-2003-aws	7.0.0-2003.14~24.04.1
+linux-modules-7.0.0-2004-aws	7.0.0-2004.14~24.04.1
+linux-modules-7.0.0-2005-aws	7.0.0-2005.14~24.04.1
+linux-modules-7.0.0-2006-aws	7.0.0-2006.14~24.04.1
+linux-modules-7.0.0-2007-aws	7.0.0-2007.14~24.04.1
+
+# GRUB saved boot choices
+saved_entry=Advanced options for Ubuntu>Ubuntu, with Linux 7.0.0-2003-aws
+next_entry=
+
+# Toolchain
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)
